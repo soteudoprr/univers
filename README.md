@@ -7,6 +7,7 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiService = game:GetService("GuiService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -22,6 +23,7 @@ local fullbrightEnabled = false
 local infiniteJumpEnabled = false
 local speedBoostEnabled = false
 local godModeEnabled = false
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 -- Configurações
 local defaultWalkSpeed = 16
@@ -98,6 +100,87 @@ closeButton.Parent = mainFrame
 local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 5)
 closeCorner.Parent = closeButton
+
+-- Botão flutuante para mobile
+local floatingButton
+if isMobile then
+    floatingButton = Instance.new("TextButton")
+    floatingButton.Name = "FloatingButton"
+    floatingButton.Size = UDim2.new(0, 60, 0, 60)
+    floatingButton.Position = UDim2.new(1, -80, 0.5, -30)
+    floatingButton.BackgroundColor3 = Color3.new(0.2, 0.4, 0.8)
+    floatingButton.BorderSizePixel = 0
+    floatingButton.Text = "🎮"
+    floatingButton.TextColor3 = Color3.new(1, 1, 1)
+    floatingButton.TextScaled = true
+    floatingButton.Font = Enum.Font.GothamBold
+    floatingButton.ZIndex = 10
+    floatingButton.Parent = screenGui
+    
+    -- Fazer o botão redondo
+    local floatingCorner = Instance.new("UICorner")
+    floatingCorner.CornerRadius = UDim.new(0.5, 0)
+    floatingCorner.Parent = floatingButton
+    
+    -- Adicionar sombra/borda
+    local floatingStroke = Instance.new("UIStroke")
+    floatingStroke.Color = Color3.new(0, 0, 0)
+    floatingStroke.Thickness = 2
+    floatingStroke.Transparency = 0.5
+    floatingStroke.Parent = floatingButton
+    
+    -- Tornar o botão arrastável
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    
+    floatingButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = floatingButton.Position
+        end
+    end)
+    
+    floatingButton.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            floatingButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    
+    floatingButton.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if dragging then
+                dragging = false
+                -- Se não arrastou muito, considera como clique
+                local delta = input.Position - dragStart
+                if delta.Magnitude < 10 then
+                    toggleMenu()
+                end
+            end
+        end
+    end)
+    
+    -- Efeito de hover/press para mobile
+    floatingButton.MouseButton1Down:Connect(function()
+        TweenService:Create(floatingButton, TweenInfo.new(0.1), {Size = UDim2.new(0, 55, 0, 55)}):Play()
+    end)
+    
+    floatingButton.MouseButton1Up:Connect(function()
+        TweenService:Create(floatingButton, TweenInfo.new(0.1), {Size = UDim2.new(0, 60, 0, 60)}):Play()
+    end)
+    
+    -- Animação de pulso sutil
+    spawn(function()
+        while floatingButton and floatingButton.Parent do
+            TweenService:Create(floatingButton, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+                BackgroundColor3 = Color3.new(0.3, 0.5, 0.9)
+            }):Play()
+            wait(2)
+        end
+    end)
+end
 
 -- Função para criar botões
 local function createButton(text, callback, color)
@@ -451,12 +534,14 @@ end
 -- Eventos
 closeButton.MouseButton1Click:Connect(toggleMenu)
 
--- Tecla para abrir/fechar o menu (Right Shift)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.RightShift then
-        toggleMenu()
-    end
-end)
+-- Tecla para abrir/fechar o menu (Right Shift) - apenas para PC
+if not isMobile then
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.RightShift then
+            toggleMenu()
+        end
+    end)
+end
 
 -- Atualizar personagem quando respawnar
 player.CharacterAdded:Connect(function(newCharacter)
@@ -465,6 +550,33 @@ player.CharacterAdded:Connect(function(newCharacter)
     
     -- Reativar funcionalidades se estavam ativas
     if flyEnabled then
+        flyEnabled = false
+        toggleFly()
+    end
+    if noClipEnabled then
+        noClipEnabled = false
+        toggleNoClip()
+    end
+    if speedBoostEnabled then
+        speedBoostEnabled = false
+        toggleSpeedBoost()
+    end
+    if godModeEnabled then
+        godModeEnabled = false
+        toggleGodMode()
+    end
+end)
+
+-- Mostrar notificação inicial
+if isMobile then
+    showNotification("🎮 Menu carregado! Toque na bolinha flutuante para abrir", Color3.new(0.1, 0.1, 0.1))
+    print("Menu Script carregado com sucesso!")
+    print("Toque na bolinha flutuante para abrir o menu")
+else
+    showNotification("🎮 Menu carregado! Pressione SHIFT DIREITO para abrir", Color3.new(0.1, 0.1, 0.1))
+    print("Menu Script carregado com sucesso!")
+    print("Pressione SHIFT DIREITO para abrir o menu")
+end
         flyEnabled = false
         toggleFly()
     end
